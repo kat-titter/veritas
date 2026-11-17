@@ -1,0 +1,85 @@
+{
+ "every": 5,
+ "runs": [
+  [
+   "a00.jpg",
+   "a01.jpg",
+   "a02.jpg",
+   "a03.jpg",
+   "a04.jpg",
+   "a05.jpg",
+   "a06.jpg",
+   "a07.jpg",
+   "a08.jpg",
+   "a09.jpg"
+  ],
+  [
+   "b00.jpg",
+   "b01.jpg",
+   "b02.jpg",
+   "b03.jpg",
+   "b04.jpg",
+   "b05.jpg",
+   "b06.jpg",
+   "b07.jpg",
+   "b08.jpg",
+   "b09.jpg"
+  ],
+  [
+   "c00.jpg",
+   "c01.jpg",
+   "c02.jpg",
+   "c03.jpg",
+   "c04.jpg",
+   "c05.jpg",
+   "c06.jpg",
+   "c07.jpg",
+   "c08.jpg",
+   "c09.jpg"
+  ],
+  [
+   "d00.jpg",
+   "d01.jpg",
+   "d02.jpg",
+   "d03.jpg",
+   "d04.jpg",
+   "d05.jpg",
+   "d06.jpg",
+   "d07.jpg",
+   "d08.jpg",
+   "d09.jpg"
+  ],
+  [
+   "e00.jpg",
+   "e01.jpg",
+   "e02.jpg",
+   "e03.jpg",
+   "e04.jpg",
+   "e05.jpg",
+   "e06.jpg",
+   "e07.jpg",
+   "e08.jpg",
+   "e09.jpg"
+  ],
+  [
+   "f00.jpg",
+   "f01.jpg",
+   "f02.jpg",
+   "f03.jpg",
+   "f04.jpg",
+   "f05.jpg",
+   "f06.jpg",
+   "f07.jpg",
+   "f08.jpg",
+   "f09.jpg"
+  ]
+ ],
+ "made": "2026-11-17",
+ "from": "frames 37368 to 37487 of one walk of the spring (code/sink.py), one in every 2",
+ "prompts": [
+  "vanitas [skull, pearls, soap bubble], overflowing by a window ~ [flower in bloom, a bee, soap bubble], unravelling in the last light",
+  "vanitas [skull, a wilting tulip, a face in profile], holding still in cold light ~ [peony, a broken string of pearls, soap bubble], about to burst at first light"
+ ],
+ "frames_without_a_logged_prompt": 28,
+ "note": "no frame was dreamed with a face at the sink"
+}

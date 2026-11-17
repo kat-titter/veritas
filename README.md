@@ -4,6 +4,8 @@ A sink you cannot wash your hands in. The water is a machine dreaming: reach in,
 It stands in two places with one water: vanitas, the sink, proposed, and veritas, the same basin on the web.
 
 - veritas: https://kat-titter.github.io/veritas/
+- v[an]itas, dry season: https://kat-titter.github.io/veritas/dry_season.html
+- about the piece: https://kat-titter.github.io/veritas/about.html
 - vanitas (proposed): https://kat-titter.github.io/vanitas-veritas/documents/Vanitas%20Veritas%20-%20Web.dc.html
 - the black paper: https://kat-titter.github.io/veritas/blackpaper.html
 
