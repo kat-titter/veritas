@@ -1,0 +1,159 @@
+# The daily refill: one allocation of dream a day. Once a day a runner dreams a new reservoir (code/refill.py in the source
+# repo, kat-titter/vanitas-veritas) out of the water the page pours now, and publishes the pages with it. The frames never enter
+# git: the site is deployed from this run's own files (Pages source: GitHub Actions), and yesterday's water is read back from the
+# live page, which is all the memory the loop has. A push to main (verse/deploy_verse.py --push) publishes the pages with the
+# water as it is.
+#   on:   gh variable set DAILY_REFILL --body on  --repo kat-titter/veritas
+#   off:  gh variable set DAILY_REFILL --body off --repo kat-titter/veritas     (the page keeps pouring the last water)
+#   now:  gh workflow run refill.yml --repo kat-titter/veritas [-f mode=text]
+#   text only every day: gh variable set REFILL_MODE --body text --repo kat-titter/veritas
+name: daily refill
+on:
+  schedule:
+    - cron: '17 12 * * *'               # 12:17 UTC: before the morning in the Americas
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "loop: today's water out of yesterday's. text: from the words alone"
+        type: choice
+        options: [loop, text]
+        default: loop
+  push:
+    branches: [main]
+  pull_request:                         # a change to this file gets a dry run: a batch dreamed each way, nothing published
+    paths: ['.github/workflows/refill.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('dry-{0}', github.ref) || 'pages' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PAGE: https://kat-titter.github.io/veritas/
+  SOURCE: kat-titter/vanitas-veritas
+
+jobs:
+  water:
+    if: github.event_name != 'schedule' || vars.DAILY_REFILL == 'on'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      actions: write                    # only for "stay scheduled" below
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: ${{ fromJSON(github.event_name == 'pull_request' && '["loop","text"]' || format('["{0}"]', inputs.mode || vars.REFILL_MODE || 'loop')) }}
+    steps:
+      - name: the built pages
+        uses: actions/checkout@v4
+        with:
+          path: site
+
+      - name: the water on the page now
+        shell: python
+        run: |
+          import json, os, pathlib, re, shutil, urllib.request
+          page, live, kept = os.environ['PAGE'] + 'reservoir/', pathlib.Path('live'), pathlib.Path('site/reservoir')
+          def get(name):
+              if not re.fullmatch(r'[\w.-]+\.(jpg|json)', name): raise ValueError(f'not a frame name: {name!r}')
+              with urllib.request.urlopen(page + name, timeout=60) as r: (live/name).write_bytes(r.read())
+          try:
+              live.mkdir(); get('index.json')
+              for f in (f for r in json.loads((live/'index.json').read_text())['runs'] for f in r): get(f)
+          except Exception as e:
+              print(f'the page gave no water ({e!r})'); shutil.rmtree(live, ignore_errors=True)
+          made = lambda d: json.loads((d/'index.json').read_text()).get('made', '') if (d/'index.json').exists() else ''
+          # the newer water pours; on a tie, the water kept in this repo: it was banked by hand (verse/reservoir.py)
+          if made(live) > made(kept):
+              print(f'the water on the page (made {made(live)}) is newer than the water kept here (made {made(kept) or "never"})')
+              shutil.rmtree(kept, ignore_errors=True); live.rename(kept)
+          else: print(f'the water kept here (made {made(kept) or "never"}) pours; on the page: made {made(live) or "none"}')
+
+      - name: the spring's code
+        if: github.event_name != 'push'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SOURCE }}
+          ref: ${{ (github.event_name == 'pull_request' && vars.REFILL_SOURCE_REF) || 'main' }}   # a dry run may try a branch of the source
+          path: src
+
+      - uses: actions/setup-python@v5
+        if: github.event_name != 'push'
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: src/code/refill.txt
+
+      - name: the weights, kept between days
+        if: github.event_name != 'push'
+        id: weights
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface/hub
+          key: refill-sd15-fp16-lcm-1
+
+      - name: dream
+        if: github.event_name != 'push'
+        env:
+          HF_HUB_OFFLINE: ${{ steps.weights.outputs.cache-hit == 'true' && '1' || '0' }}
+          HF_HUB_DISABLE_TELEMETRY: '1'
+        run: |
+          pip install -q -r src/code/refill.txt
+          python src/code/refill.py --selftest
+          python src/code/refill.py ${{ matrix.mode == 'loop' && '--from site/reservoir' || '' }} --out water
+          rm -rf site/reservoir && mv water site/reservoir
+
+      - name: check the water
+        shell: python
+        run: |
+          import json, pathlib, re, sys
+          R = pathlib.Path('site/reservoir'); m = json.loads((R/'index.json').read_text()); runs = m['runs']
+          listed = [f for r in runs for f in r]; there = {f.name: f.stat().st_size for f in R.iterdir()}; total = sum(there.values())
+          wrong = ([f'{f} is listed and missing' for f in listed if f not in there] + [f'{f} is not listed' for f in there if f not in listed + ['index.json']]
+                   + [f'{f} is not a name the page reads' for f in listed if not re.fullmatch(r'[\w.-]+\.jpg', f)]
+                   + [f'{f} is {there[f]} bytes: an empty frame' for f in listed if there.get(f, 1e9) < 5000]
+                   + ([f'{total} bytes: over 6,000,000'] if total > 6_000_000 else []) + (['no frames'] if not listed else [])
+                   + (['a prompt carries --oref: a face at the sink'] if any('--oref' in p for p in m.get('prompts', [])) else []))
+          print(f'{len(runs)} dreams, {len(listed)} frames, {total} bytes, made {m.get("made")}: {m.get("from")}')
+          for p in m.get('prompts', []): print('  ', p)
+          if wrong: sys.exit('the water is not whole, nothing is published:\n  ' + '\n  '.join(wrong))
+
+      - name: the batch, to look at
+        if: github.event_name != 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: water-${{ matrix.mode }}
+          path: site/reservoir
+          retention-days: 14
+
+      - name: the pages, with the water
+        if: github.event_name != 'pull_request'
+        run: rm -rf site/.git site/.github
+
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
+        with:
+          path: site
+
+      - name: stay scheduled        # GitHub switches a schedule off after 60 days with no activity in a public repo; the refill makes no commits
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/$GITHUB_REPOSITORY/actions/workflows/refill.yml/enable" || echo "could not re-enable; a push to this repo before day 60 does the same"
+
+  publish:
+    needs: water
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.go.outputs.page_url }}
+    steps:
+      - id: go
+        uses: actions/deploy-pages@v4
