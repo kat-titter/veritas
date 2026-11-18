@@ -73,10 +73,14 @@ const TAP = [0.5, 0.5 + 0.27];
 // The nasty has its own strength, apart from the look. Unset, both are k and the water is as it was:
 //   ?kn=<0 to 1> weird time (1 and 6: backwards, the stall, the skip, the picture's lag). Set, time is also drawn: the picture leans from the hole as the clock slows, and into it as the clock runs fast
 //   ?kf=<0 to 1> the face (8). Set, it stands upright over the drain: two hollows above the hole, and the hole is its mouth
+// The frame and the words, both off unless set:
+//   ?kb=<0 to 1> no clear border: the steel lip goes and the water fades unevenly into the dark, so the basin is implied by its light
+//   ?kc=rim the code, hidden: no line under the basin; lost = mm:ss shows only in the clear breath, small along the drain's rim. Any other ?kc: no code at all
 // ?kx=<digits> keeps only those moves (kx=25: the hole and the lost line).
 const K = Math.max(0, Math.min(1, parseFloat(params.get('k')) || 0)), KX = params.get('kx') || '123456789', kOn = (n) => K > 0 && KX.includes(n);
 const kNum = (name, def) => params.has(name) ? Math.max(0, Math.min(1, parseFloat(params.get(name)) || 0)) : def;   // a strength of its own, 0 to 1
 const KD = kOn('9') ? kNum('kd', 1) : 0, KN = kNum('kn', K), KLEAN = K > 0 && params.has('kn'), KF = kNum('kf', K), KFACE = K > 0 && params.has('kf');
+const KE = K > 0 ? kNum('kb', 0) : 0, KC = K > 0 && params.has('kc') ? (params.get('kc') === 'rim' ? 'rim' : 'none') : '';
 
 const view = { w:1, h:1, cx:0, cy:0, S:1, dpr:1 };
 function layout(){
@@ -369,7 +373,7 @@ if (K > 0) {                                           // ?k: the k lines join t
   put('dye', '*smoothstep(RD, 0.10, r)*(1.-held));', '*mix(smoothstep(RD, 0.10, r), smoothstep(RD*0.8, RD*1.6, r), uKRev)*(1.-held)*(1.-0.85*uKSoft));', 'swap');
   put('display', 'void main(){', `uniform vec4 uKH;                  // the hole: the ring's radius, the turn of each copy, the picture's mip level at 1:1, how soft
 uniform vec4 uKB;                  // the beat: its phase, its strength, the shimmer's clock, how clear
-uniform float uKI, uKF, uKFm, uKT; // 7 how iridescent; 8 how far the second face has surfaced, and which face; how far the picture leans to the hole
+uniform float uKI, uKF, uKFm, uKT, uKE; // 7 how iridescent; 8 how far the second face has surfaced, and which face; how far the picture leans to the hole
 float kLod = 0., kDeep = 0.;
 vec4 kdye(vec2 p){ return textureLod(uDye, p, kLod); }
 const float KS = 2.4;              // each copy of the basin is this many times smaller than the last
@@ -390,6 +394,8 @@ vec2 khole(vec2 q, float r){       // 2 inside the ring the basin is seen again,
   put('display', 'vec2 ql = q;', ' ql += kshim;');
   put('display', 'vec3 c = clamp(texture(uDye, p).rgb, 0., 1.);', ' c = clamp(c + (c - textureLod(uDye, p, kLod + 2.5).rgb)*0.7*uKB.w, 0., 1.);   // 4 clear: sharper than the water has been');
   put('display', 'col = mix(col, b, smoothstep(0.002, -0.006, sd));', 'b *= 1. + 0.07*kin*(kb - 0.5); ', 'before');
+  put('display', 'col = mix(col, b, smoothstep(0.002, -0.006, sd));', 'col = mix(col, b, smoothstep(0.002, -0.006 - uKE*(0.05 + 0.08*vnoise(q*6. + 0.02*uTime)), sd));', 'swap');   // ?kb: no clear border, the water fades unevenly into the dark
+  put('display', 'col = mix(col, steel, lip*0.9);', 'col = mix(col, steel, lip*0.9*(1. - uKE));', 'swap');   // and the steel lip goes
   put('display', 'vec3 c = clamp(texture(uDye, p).rgb, 0., 1.);', `
     if (uKFm < 0.5) { vec3 g = textureLod(uDye, C + vec2(-ql.x, ql.y)*0.62 + 0.04*vec2(sin(uTime*0.05), cos(uTime*0.037)), max(0., uKH.z) + 2.4).rgb;   // 8 the dream again: mirrored, larger, soft, adrift
       c = clamp(c*(1. + 1.1*uKF*(lum(g) - 0.35)) + g*0.22*uKF*(1. - c), 0., 1.); }                                                  // it shades the water more than it shows on it
@@ -652,6 +658,22 @@ const kq = { w:1, d:1, dr:0, dw:1, lean:0, hist:[], t:0, bub:100, unpop:0, ph:0,
 const kMip = K > 0 ? gl.createSampler() : null;          // the far copies and the soft water are read from smaller copies of the picture
 if (kMip) { gl.samplerParameteri(kMip, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.samplerParameteri(kMip, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.samplerParameteri(kMip, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.samplerParameteri(kMip, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); }
+// ?kc: the code, hidden. kc=rim: no line under the basin; one short line, lost = mm:ss, shows only in the clear breath, small along the drain's rim. Any other kc: no code at all
+let kRim = null;
+if (KC) codeEl.style.display = 'none';
+if (KC === 'rim') { const mk = (n) => document.createElementNS('http://www.w3.org/2000/svg', n), svg = mk('svg'), path = mk('path'), text = mk('text'), tp = mk('textPath');
+  svg.setAttribute('aria-hidden', 'true'); Object.assign(svg.style, { position:'fixed', inset:'0', width:'100%', height:'100%', pointerEvents:'none', opacity:'0', mixBlendMode:'difference' });   // the line inverts the water under it: dark on bright, pale on dark
+  path.id = 'krim'; path.setAttribute('fill', 'none'); tp.setAttribute('href', '#krim'); tp.setAttribute('startOffset', '25%'); text.setAttribute('text-anchor', 'middle');
+  Object.assign(text.style, { fontFamily:'var(--mono)', letterSpacing:'.22em', fill:'var(--bone)' });
+  text.append(tp); svg.append(path, text); document.body.append(svg); kRim = { svg, path, text, tp, key:'', said:'' }; }
+function kRimDraw(){                                  // once a frame: where the rim is, what it says, how clear
+  const r = RD_PX()*1.55, key = `${view.cx} ${view.cy} ${r}`;
+  if (key !== kRim.key) { kRim.key = key; kRim.path.setAttribute('d', `M${view.cx - r},${view.cy}A${r},${r} 0 1 1 ${view.cx + r},${view.cy}A${r},${r} 0 1 1 ${view.cx - r},${view.cy}`);
+    kRim.text.style.fontSize = Math.max(9, Math.min(13, 0.0105*view.S)) + 'px'; }
+  if (kq.lost !== kRim.said) kRim.tp.textContent = kRim.said = kq.lost;
+  kRim.svg.style.opacity = (0.85*kq.clear).toFixed(3);
+}
+const RD_PX = () => 0.030*view.S;                     // the drain's radius on the page (RD in the shaders)
 function kBack(t){                                    // 1: one stretch backwards in every 36 s, 6 to 14 s long at k = 1 (0 forwards, 1 backwards)
   const T = 36, n = Math.floor(t/T), x = t - n*T, len = (6 + 8*kh(n))*KN, at = 8 + (T - 12 - len)*kh(n + 0.5);
   return kss(at, at + 2, x)*(1 - kss(at + len, at + len + 2, x));
@@ -798,7 +820,7 @@ function render(){
   if (mips) { gl.generateMipmap(gl.TEXTURE_2D); gl.bindSampler(0, kMip); }
   if (K > 0) { gl.uniform4f(u.uKH, kOn('2') ? (0.03 + 0.11*kq.e)*(1 - plugAmt) : 0, kq.e*(0.55 + 0.25*Math.sin(simTime*0.11)), mips ? Math.log2(dye.read.w/(view.S*d)) : -99, 2.2*kq.e*kq.soft);
     gl.uniform4f(u.uKB, kq.ph, kq.amp, simTime, K*kq.clear); gl.uniform1f(u.uKI, kOn('7') ? kq.e : 0);
-    gl.uniform1f(u.uKF, kOn('8') ? KF*(1 - kq.clear)*Math.pow(0.5 + 0.5*Math.sin(simTime*0.29 + 1.3), 2) : 0); gl.uniform1f(u.uKFm, KFACE ? 1 : 0); gl.uniform1f(u.uKT, kq.lean); }   // 8: up for a few seconds in every 22
+    gl.uniform1f(u.uKF, kOn('8') ? KF*(1 - kq.clear)*Math.pow(0.5 + 0.5*Math.sin(simTime*0.29 + 1.3), 2) : 0); gl.uniform1f(u.uKFm, KFACE ? 1 : 0); gl.uniform1f(u.uKT, kq.lean); gl.uniform1f(u.uKE, KE); }   // 8: up for a few seconds in every 22
   draw(null); if (mips) gl.bindSampler(0, null);
 }
 
@@ -824,7 +846,7 @@ function frame(now){
   holdAmt += ((hand.down ? 1 : 0)-holdAmt)*(1-Math.exp(-dt/0.25));
   plugAmt += ((plug ? 1 : 0)-plugAmt)*(1-Math.exp(-dt/0.15));
   if (dt > 0) step(dt);
-  render(); words(); send(false);
+  render(); words(); if (kRim) kRimDraw(); send(false);
   nextFrame(frame);
 }
 addEventListener('resize', layout);
