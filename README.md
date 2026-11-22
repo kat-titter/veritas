@@ -8,3 +8,4 @@ It stands in two places with one water: vanitas, the sink, proposed, and veritas
 - the black paper: https://kat-titter.github.io/veritas/blackpaper.html
 
 By Kat Titterton (macrofluidic). These are built pages; the sources live in https://github.com/kat-titter/vanitas-veritas.
+Two are kept by hand: about.html and dry_season.html forward to [s[i/y]n[k][w]hole (kat-titter/currents-2027) and wear its icon.
